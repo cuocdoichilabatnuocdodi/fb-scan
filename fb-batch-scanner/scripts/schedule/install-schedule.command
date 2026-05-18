@@ -79,7 +79,7 @@ if [ "$OS" = "Darwin" ]; then
   <array>
     <string>/bin/zsh</string>
     <string>-c</string>
-    <string>cd "$PROJECT_DIR" && "$NODE_BIN" run.js</string>
+    <string>PID=\$(lsof -ti tcp:3000 -sTCP:LISTEN 2>/dev/null | head -n1); [ -n "\$PID" ] && kill -9 \$PID; sleep 1; cd "$PROJECT_DIR" && "$NODE_BIN" run.js</string>
   </array>
   <key>StartCalendarInterval</key>
   <dict>
@@ -102,7 +102,7 @@ EOF
 elif [ "$OS" = "Linux" ]; then
   # ─── Linux: cron ──────────────────────────────────────────────────
   echo "  Detected Linux → installing crontab entry"
-  CRON_LINE="$SCHEDULE_MIN $SCHEDULE_HOUR * * * cd \"$PROJECT_DIR\" && \"$NODE_BIN\" run.js >> \"$PROJECT_DIR/logs/cron.out\" 2>> \"$PROJECT_DIR/logs/cron.err\""
+  CRON_LINE="$SCHEDULE_MIN $SCHEDULE_HOUR * * * PID=\$(lsof -ti tcp:3000 -sTCP:LISTEN 2>/dev/null | head -n1); [ -n \"\$PID\" ] && kill -9 \$PID; sleep 1; cd \"$PROJECT_DIR\" && \"$NODE_BIN\" run.js >> \"$PROJECT_DIR/logs/cron.out\" 2>> \"$PROJECT_DIR/logs/cron.err\""
   MARKER="# fb-batch-scanner ($LABEL)"
 
   # Remove existing entry then add fresh

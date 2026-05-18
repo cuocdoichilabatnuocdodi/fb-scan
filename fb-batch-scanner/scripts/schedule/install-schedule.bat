@@ -70,8 +70,10 @@ if not errorlevel 1 (
   schtasks /Delete /TN "%TASK_NAME%" /F >nul
 )
 
-:: The action: cd to project, run node run.js, append logs
-set "CMD=cmd /c cd /d \"%PROJECT_DIR%\" ^&^& \"%NODE_BIN%\" run.js >> \"%PROJECT_DIR%\logs\sched.out\" 2>> \"%PROJECT_DIR%\logs\sched.err\""
+:: The action: free port 3000 (in case held by stale process), then cd to project, run node run.js, append logs.
+:: PowerShell handles port-kill cleaner than nested for/netstat inside schtasks.
+set "KILL_PORT=powershell -NoProfile -Command \"Get-NetTCPConnection -LocalPort 3000 -State Listen -EA SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -EA SilentlyContinue }\""
+set "CMD=cmd /c %KILL_PORT% ^& cd /d \"%PROJECT_DIR%\" ^&^& \"%NODE_BIN%\" run.js >> \"%PROJECT_DIR%\logs\sched.out\" 2>> \"%PROJECT_DIR%\logs\sched.err\""
 
 :: Create logs dir
 if not exist "%PROJECT_DIR%\logs" mkdir "%PROJECT_DIR%\logs"

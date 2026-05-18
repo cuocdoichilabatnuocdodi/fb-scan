@@ -45,6 +45,14 @@ fi
 echo "  Starting batch... (Ctrl+C to abort)"
 echo
 
+# Free port 3000 if held by a stale process (previous hung scan, other dev server, etc.)
+PORT_PID="$(lsof -ti tcp:3000 -sTCP:LISTEN 2>/dev/null | head -n1 || true)"
+if [ -n "$PORT_PID" ]; then
+  echo "  ⚠️  Port 3000 held by PID $PORT_PID — killing..."
+  kill -9 "$PORT_PID" 2>/dev/null || true
+  sleep 1
+fi
+
 cd "$PROJECT_DIR"
 "$NODE_BIN" run.js
 EXIT_CODE=$?

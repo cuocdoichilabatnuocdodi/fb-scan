@@ -54,6 +54,12 @@ if errorlevel 1 (
 echo   Starting batch... (Ctrl+C to abort)
 echo.
 
+:: Free port 3000 if held by a stale process (previous hung scan, other dev server, etc.)
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3000 " ^| findstr "LISTENING" 2^>nul') do (
+  echo   WARN: Port 3000 held by PID %%a -- killing...
+  taskkill /F /PID %%a >nul 2>&1
+)
+
 cd /d "%PROJECT_DIR%"
 "%NODE_BIN%" run.js
 set "EXIT_CODE=%ERRORLEVEL%"
