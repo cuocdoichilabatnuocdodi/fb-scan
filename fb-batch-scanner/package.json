@@ -1,0 +1,19 @@
+{
+  "name": "fb-batch-scanner",
+  "version": "1.0.0",
+  "description": "Batch scan multiple Facebook groups via Qing Cracked extension + Playwright",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node run.js",
+    "tunnel": "cloudflared tunnel --url http://localhost:${PORT:-3000}",
+    "reset-session": "rm -rf fb-session && echo 'session cleared — will need login next run'",
+    "reset-state": "rm -f state.json && echo 'state cleared — will rescan all groups'",
+    "report": "node scripts/report.js",
+    "report:today": "node scripts/report.js --today"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0",
+    "dotenv": "^16.4.5"
+  }
+}

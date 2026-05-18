@@ -1,0 +1,9 @@
+.env
+node_modules/
+fb-session/
+downloads/
+logs/
+state.json
+runs.jsonl
+*.log
+.DS_Store

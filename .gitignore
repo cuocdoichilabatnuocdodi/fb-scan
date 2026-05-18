@@ -1,0 +1,27 @@
+# Cracked extension — NOT in repo (copyright concerns + size)
+extension/
+
+# Scraped data — never push
+posts-exporter-for-facebook/
+
+# Inside scanner project
+fb-batch-scanner/.env
+fb-batch-scanner/fb-session/
+fb-batch-scanner/node_modules/
+fb-batch-scanner/logs/
+fb-batch-scanner/state.json
+fb-batch-scanner/runs.jsonl
+fb-batch-scanner/downloads/
+fb-batch-scanner/package-lock.json
+
+# Backup files from patches
+**/*.bak
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Misc
+*.log
+.idea/
+.vscode/

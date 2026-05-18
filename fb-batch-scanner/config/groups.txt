@@ -1,0 +1,10 @@
+# 1 group URL per line. Lines starting with # are comments.
+# Example:
+# https://www.facebook.com/groups/javascript.vn
+# https://www.facebook.com/groups/codeforvn
+# https://www.facebook.com/groups/123456789012345
+
+# === YOUR GROUPS BELOW ===
+
+https://www.facebook.com/groups/VietnamGamingConner
+https://www.facebook.com/groups/760589759199370/

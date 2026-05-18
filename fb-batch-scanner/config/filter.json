@@ -1,0 +1,42 @@
+{
+  "$schema_note": "Filter config applied to ALL groups in the batch. See README for field meanings.",
+
+  "fetchQuantity": {
+    "mode": "BY_DAYS_COUNT",
+    "_modeOptions": ["FETCH_ALL", "BY_POST_COUNT", "BY_DAYS_COUNT"],
+
+    "days": 1,
+    "_days_note": "Used when mode = BY_DAYS_COUNT. 1 = today (from 00:00). 7 = last 7 calendar days.",
+
+    "_postsCount": 2,
+    "_postsCount_note": "Used when mode = BY_POST_COUNT. Hard cap on posts per group."
+  },
+
+  "options": {
+    "includeComments": false,
+    "_includeComments_note": "Fetch comments per post. Slows down significantly.",
+
+    "includeNestingComments": false,
+    "_includeNestingComments_note": "Fetch replies-to-replies. Requires includeComments=true.",
+
+    "commentsLimitPerPost": 100,
+    "_commentsLimit_note": "Max comments fetched per post (0 = no limit).",
+
+    "includeAttachments": true,
+    "_includeAttachments_note": "Download images/videos to disk.",
+
+    "translateContent": false,
+    "_translateContent_note": "Translate post content to target language (uses extension's translator).",
+
+    "saveAsJSON": true,
+    "_saveAsJSON_note": "Write post.json per post.",
+
+    "generateHTML": false,
+    "_generateHTML_note": "Generate post.html viewable in browser. Heavy."
+  },
+
+  "advanced": {
+    "requestDelaySeconds": 1,
+    "_requestDelay_note": "Delay between FB GraphQL requests. Higher = safer but slower. 0-5 recommended."
+  }
+}
