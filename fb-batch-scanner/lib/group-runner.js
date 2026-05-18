@@ -126,7 +126,32 @@ async function applyFilter(page, filter, logger) {
   logger.debug('filter applied', { mode, ...filter.fetchQuantity });
 }
 
-async function runGroup({ context, fbPage, url, filter, emitter, timeoutMs, pageLoadWaitMs, logger }) {
+// If no webhook events arrive within this window after Start, assume the extension
+// isn't actually wired to our webhook server (license gate, stale config, etc.) and
+// fail fast instead of waiting for the full timeoutMs.
+const NO_EVENT_GRACE_MS = 45_000;
+const HEARTBEAT_MS = 30_000;
+
+async function verifyWebhookEnabledInStorage(sw, logger) {
+  if (!sw) return null;
+  try {
+    return await sw.evaluate(async () => {
+      const all = await chrome.storage.local.get(null);
+      for (const k of Object.keys(all)) {
+        const v = all[k];
+        if (v && typeof v === 'object' && !Array.isArray(v) && 'webhookEnabled' in v) {
+          return { key: k, enabled: v.webhookEnabled === true };
+        }
+      }
+      return { key: null, enabled: false };
+    });
+  } catch (e) {
+    logger.debug(`webhookEnabled verify eval failed: ${e.message}`);
+    return null;
+  }
+}
+
+async function runGroup({ context, fbPage, sw, url, filter, emitter, timeoutMs, pageLoadWaitMs, logger }) {
   // 1. Navigate to group
   logger.info(`navigating: ${url}`);
   await fbPage.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -164,22 +189,84 @@ async function runGroup({ context, fbPage, url, filter, emitter, timeoutMs, page
     logger.warn('applyFilter exception (continuing with whatever was set)', { err: e.message });
   }
 
+  // 4b. Verify webhookEnabled is actually true in extension storage.
+  // The modal's Webhook checkbox click is gated by a license check that can silently
+  // reject the toggle (input.checked goes true but the real flag stays false → no events).
+  // setupWebhookConfig should have force-enabled this at batch start, but verify per-group
+  // in case the bucket was rewritten by the user opening the modal manually.
+  const verify = await verifyWebhookEnabledInStorage(sw, logger);
+  if (verify && !verify.enabled) {
+    if (sw) {
+      logger.warn(`webhookEnabled is false in storage (key="${verify.key}") — re-forcing`);
+      try {
+        await sw.evaluate(async (k) => {
+          const all = await chrome.storage.local.get([k]);
+          await chrome.storage.local.set({ [k]: { ...(all[k] || {}), webhookEnabled: true } });
+        }, verify.key);
+        // Re-open modal so React picks up the new state (otherwise the in-memo modal
+        // state may still hold the old false). Cheapest path: close + click trigger again.
+        try {
+          await fbPage.keyboard.press('Escape').catch(() => {});
+          await fbPage.waitForTimeout(300);
+          await fbPage.locator(SELECTORS.triggerButton).first().evaluate(el => el.click());
+          await fbPage.waitForSelector(SELECTORS.startButton, { timeout: 10000 });
+          await fbPage.waitForTimeout(500);
+          await applyFilter(fbPage, filter, logger);
+        } catch (e) {
+          logger.warn(`could not re-open modal after forcing webhookEnabled: ${e.message}`);
+        }
+      } catch (e) {
+        throw new Error(`webhookEnabled is false and could not force-enable: ${e.message}`);
+      }
+    } else {
+      throw new Error(`webhookEnabled is false in storage (key="${verify.key}") and no SW reference available to fix it — extension license check likely blocking webhook feature`);
+    }
+  } else if (verify === null) {
+    logger.debug('webhookEnabled verify skipped (no SW)');
+  } else {
+    logger.debug(`webhookEnabled verified true in bucket "${verify.key}"`);
+  }
+
   // 5. Set up webhook completion listener BEFORE clicking Start.
   // Also capture collectionId from earlier events (posts.batch / export.start)
   // since it's NOT in export.completed payload.
   let capturedCollectionId = null;
+  let eventCount = 0;
+  let firstEventTs = null;
   const completionPromise = new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
+    const hardTimeout = setTimeout(() => {
       emitter.off('event', handler);
-      reject(new Error(`timeout after ${timeoutMs}ms (no webhook event received — check tunnel/url/secret)`));
+      clearInterval(heartbeat);
+      clearTimeout(graceTimeout);
+      reject(new Error(`timeout after ${timeoutMs}ms (got ${eventCount} events; check tunnel/url/secret if 0)`));
     }, timeoutMs);
 
+    // If 0 events arrive within the grace window, fail fast — something is wired wrong
+    // (license-gated webhook, stale config, extension not reaching localhost, etc).
+    const graceTimeout = setTimeout(() => {
+      if (eventCount === 0) {
+        emitter.off('event', handler);
+        clearInterval(heartbeat);
+        clearTimeout(hardTimeout);
+        reject(new Error(`no webhook events received within ${NO_EVENT_GRACE_MS}ms after Start — likely webhookEnabled is rejected by license check, or extension cannot reach http://localhost (check extension's Webhook Settings page)`));
+      }
+    }, NO_EVENT_GRACE_MS);
+
+    const heartbeat = setInterval(() => {
+      const sinceFirst = firstEventTs ? ((Date.now() - firstEventTs) / 1000).toFixed(0) : 'none';
+      logger.debug(`waiting... events=${eventCount} (first event ${sinceFirst}s ago)`);
+    }, HEARTBEAT_MS);
+
     const handler = (payload) => {
+      eventCount += 1;
+      if (firstEventTs === null) firstEventTs = Date.now();
       if (payload.data && payload.data.collectionId && !capturedCollectionId) {
         capturedCollectionId = payload.data.collectionId;
       }
       if (['export.completed', 'export.stopped', 'export.failed'].includes(payload.event)) {
-        clearTimeout(timeout);
+        clearTimeout(hardTimeout);
+        clearTimeout(graceTimeout);
+        clearInterval(heartbeat);
         emitter.off('event', handler);
         // Inject collectionId into result so callers can read it
         if (capturedCollectionId) {

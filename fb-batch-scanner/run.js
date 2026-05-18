@@ -171,6 +171,7 @@ async function main() {
         context,
         extId,
         fbPage,
+        sw,
         url,
         filter,
         emitter: ws.emitter,
